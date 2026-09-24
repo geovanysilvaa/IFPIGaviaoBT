@@ -1,13 +1,23 @@
+import { Categoria } from "./categoria";
+import { Produto } from "./produto";
+
 // ============================================================================
-// SIMULAÇÃO DO BANCO DE DADOS LOCAL (IFPI GAVIÃO)
-// ATENÇÃO: Este banco simula um atraso de rede/I/O assíncrono (como SQLite/API real)
-// No padrão Big Tripe, as telas importam e manipulam diretamente estas funções e dados
-// sem tipagem formal, repositórios ou ViewModels.
+// MODEL: DataSource
+// CardapioDataSource é responsável por guardar e recuperar os dados do
+// cardápio. Hoje os dados estão em memória (um "banco local" simulado com
+// pequeno atraso assíncrono), mas amanhã poderiam vir de um SQLite, de um
+// AsyncStorage ou de uma API REST, sem que a ViewModel precise mudar: o
+// propósito desta classe é guardar/buscar dados, por isso ela é um
+// DataSource, e não um Service.
 // ============================================================================
 
 const DELAY_MS = 600; // Simula 600ms de latência de consulta local
 
-export const BANCO_CATEGORIAS = [
+function esperar(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+const CATEGORIAS: Categoria[] = [
   {
     id: "comidas",
     nome: "Comidas",
@@ -24,7 +34,7 @@ export const BANCO_CATEGORIAS = [
   },
 ];
 
-export const BANCO_PRODUTOS = [
+const PRODUTOS: Produto[] = [
   {
     id: "pastel-de-carne",
     categoriaId: "comidas",
@@ -139,18 +149,19 @@ export const BANCO_PRODUTOS = [
   },
 ];
 
-// Funções de consulta com simulação de delay assíncrono (simulando IO de banco de dados)
-export async function simularConsultaCategorias() {
-  await new Promise((resolve) => setTimeout(resolve, DELAY_MS));
-  return [...BANCO_CATEGORIAS];
-}
+export class CardapioDataSource {
+  async buscarCategorias(): Promise<Categoria[]> {
+    await esperar(DELAY_MS);
+    return [...CATEGORIAS];
+  }
 
-export async function simularConsultaProdutosPorCategoria(categoriaId: string) {
-  await new Promise((resolve) => setTimeout(resolve, DELAY_MS));
-  return BANCO_PRODUTOS.filter((p) => p.categoriaId === categoriaId);
-}
+  async buscarProdutosPorCategoria(categoriaId: string): Promise<Produto[]> {
+    await esperar(DELAY_MS);
+    return PRODUTOS.filter((produto) => produto.categoriaId === categoriaId);
+  }
 
-export async function simularConsultaProdutoPorId(produtoId: string) {
-  await new Promise((resolve) => setTimeout(resolve, DELAY_MS));
-  return BANCO_PRODUTOS.find((p) => p.id === produtoId);
+  async buscarProdutoPorId(produtoId: string): Promise<Produto | undefined> {
+    await esperar(DELAY_MS);
+    return PRODUTOS.find((produto) => produto.id === produtoId);
+  }
 }
