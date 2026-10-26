@@ -153,7 +153,9 @@ export default function ItemDetailScreen() {
         </ScrollView>
       ) : (
         <View style={styles.erroContainer}>
-          <Text style={styles.erroTexto}>Item não encontrado.</Text>
+          <Text style={styles.erroTexto}>
+            {state.erro ?? "Item não encontrado."}
+          </Text>
         </View>
       )}
     </View>

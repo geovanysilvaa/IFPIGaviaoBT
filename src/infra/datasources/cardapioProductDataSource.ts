@@ -1,14 +1,12 @@
-import { Categoria } from "./categoria";
-import { Produto } from "./produto";
+import { Produto } from "@/model/entities/produto";
+import { DataSourceError } from "@/model/errors";
+import { IProductDataSource } from "@/model/datasources/iProductDataSource";
 
 // ============================================================================
-// MODEL: DataSource
-// CardapioDataSource é responsável por guardar e recuperar os dados do
-// cardápio. Hoje os dados estão em memória (um "banco local" simulado com
-// pequeno atraso assíncrono), mas amanhã poderiam vir de um SQLite, de um
-// AsyncStorage ou de uma API REST, sem que a ViewModel precise mudar: o
-// propósito desta classe é guardar/buscar dados, por isso ela é um
-// DataSource, e não um Service.
+// INFRAESTRUTURA: CardapioProductDataSource
+// Implementação concreta de IProductDataSource sobre um "banco" em memória
+// com atraso assíncrono simulando latência. Erros técnicos são convertidos em
+// DataSourceError, de modo que nenhum detalhe de infraestrutura vaze para cima.
 // ============================================================================
 
 const DELAY_MS = 600; // Simula 600ms de latência de consulta local
@@ -16,23 +14,6 @@ const DELAY_MS = 600; // Simula 600ms de latência de consulta local
 function esperar(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
-
-const CATEGORIAS: Categoria[] = [
-  {
-    id: "comidas",
-    nome: "Comidas",
-    corBorda: "#501673",
-    corSeta: "#501673",
-    imagem: require("../../assets/images/menu/categoria-comidas.png"),
-  },
-  {
-    id: "bebidas",
-    nome: "Bebidas",
-    corBorda: "#1b873f",
-    corSeta: "#1b873f",
-    imagem: require("../../assets/images/menu/categoria-bebidas.png"),
-  },
-];
 
 const PRODUTOS: Produto[] = [
   {
@@ -46,8 +27,8 @@ const PRODUTOS: Produto[] = [
     proteinas: "14g",
     carboidratos: "32g",
     gorduras: "18g",
-    imagem: require("../../assets/images/menu/pastel-de-carne.png"),
-    imagemGrande: require("../../assets/images/menu/pastel-de-carne.png"),
+    imagem: require("../../../assets/images/menu/pastel-de-carne.png"),
+    imagemGrande: require("../../../assets/images/menu/pastel-de-carne.png"),
   },
   {
     id: "coxinha-de-frango",
@@ -60,8 +41,8 @@ const PRODUTOS: Produto[] = [
     proteinas: "18g",
     carboidratos: "38g",
     gorduras: "15g",
-    imagem: require("../../assets/images/menu/coxinha-de-frango.png"),
-    imagemGrande: require("../../assets/images/menu/coxinha-de-frango.png"),
+    imagem: require("../../../assets/images/menu/coxinha-de-frango.png"),
+    imagemGrande: require("../../../assets/images/menu/coxinha-de-frango.png"),
   },
   {
     id: "cuscuz-com-ovo",
@@ -74,8 +55,8 @@ const PRODUTOS: Produto[] = [
     proteinas: "12g",
     carboidratos: "40g",
     gorduras: "9g",
-    imagem: require("../../assets/images/menu/cuscuz-com-ovo.png"),
-    imagemGrande: require("../../assets/images/menu/cuscuz-com-ovo.png"),
+    imagem: require("../../../assets/images/menu/cuscuz-com-ovo.png"),
+    imagemGrande: require("../../../assets/images/menu/cuscuz-com-ovo.png"),
   },
   {
     id: "arrumadinho-completo",
@@ -88,8 +69,8 @@ const PRODUTOS: Produto[] = [
     proteinas: "22g",
     carboidratos: "45g",
     gorduras: "12g",
-    imagem: require("../../assets/images/menu/arrumadinho-completo.png"),
-    imagemGrande: require("../../assets/images/menu/arrumadinho-completo-large.png"),
+    imagem: require("../../../assets/images/menu/arrumadinho-completo.png"),
+    imagemGrande: require("../../../assets/images/menu/arrumadinho-completo-large.png"),
   },
   {
     id: "suco-de-laranja",
@@ -102,8 +83,8 @@ const PRODUTOS: Produto[] = [
     proteinas: "2g",
     carboidratos: "26g",
     gorduras: "0g",
-    imagem: require("../../assets/images/menu/suco-de-laranja.png"),
-    imagemGrande: require("../../assets/images/menu/suco-de-laranja.png"),
+    imagem: require("../../../assets/images/menu/suco-de-laranja.png"),
+    imagemGrande: require("../../../assets/images/menu/suco-de-laranja.png"),
   },
   {
     id: "refrigerante-lata",
@@ -116,8 +97,8 @@ const PRODUTOS: Produto[] = [
     proteinas: "0g",
     carboidratos: "37g",
     gorduras: "0g",
-    imagem: require("../../assets/images/menu/refrigerante.png"),
-    imagemGrande: require("../../assets/images/menu/refrigerante.png"),
+    imagem: require("../../../assets/images/menu/refrigerante.png"),
+    imagemGrande: require("../../../assets/images/menu/refrigerante.png"),
   },
   {
     id: "cafe-expresso",
@@ -130,8 +111,8 @@ const PRODUTOS: Produto[] = [
     proteinas: "0g",
     carboidratos: "1g",
     gorduras: "0g",
-    imagem: require("../../assets/images/menu/cafe-expresso.png"),
-    imagemGrande: require("../../assets/images/menu/cafe-expresso.png"),
+    imagem: require("../../../assets/images/menu/cafe-expresso.png"),
+    imagemGrande: require("../../../assets/images/menu/cafe-expresso.png"),
   },
   {
     id: "suco-acerola",
@@ -144,24 +125,33 @@ const PRODUTOS: Produto[] = [
     proteinas: "1g",
     carboidratos: "15g",
     gorduras: "0g",
-    imagem: require("../../assets/images/menu/suco-acerola.png"),
-    imagemGrande: require("../../assets/images/menu/suco-acerola.png"),
+    imagem: require("../../../assets/images/menu/suco-acerola.png"),
+    imagemGrande: require("../../../assets/images/menu/suco-acerola.png"),
   },
 ];
 
-export class CardapioDataSource {
-  async buscarCategorias(): Promise<Categoria[]> {
-    await esperar(DELAY_MS);
-    return [...CATEGORIAS];
-  }
-
+export class CardapioProductDataSource implements IProductDataSource {
   async buscarProdutosPorCategoria(categoriaId: string): Promise<Produto[]> {
-    await esperar(DELAY_MS);
-    return PRODUTOS.filter((produto) => produto.categoriaId === categoriaId);
+    try {
+      await esperar(DELAY_MS);
+      return PRODUTOS.filter((produto) => produto.categoriaId === categoriaId);
+    } catch (causaOriginal: unknown) {
+      throw new DataSourceError(
+        "Não foi possível carregar os itens desta categoria.",
+        causaOriginal
+      );
+    }
   }
 
   async buscarProdutoPorId(produtoId: string): Promise<Produto | undefined> {
-    await esperar(DELAY_MS);
-    return PRODUTOS.find((produto) => produto.id === produtoId);
+    try {
+      await esperar(DELAY_MS);
+      return PRODUTOS.find((produto) => produto.id === produtoId);
+    } catch (causaOriginal: unknown) {
+      throw new DataSourceError(
+        "Não foi possível carregar os detalhes do item.",
+        causaOriginal
+      );
+    }
   }
 }

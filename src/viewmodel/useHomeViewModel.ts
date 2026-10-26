@@ -1,51 +1,61 @@
 import { useEffect, useState } from "react";
 import { router } from "expo-router";
-import { CardapioDataSource } from "@/model/cardapioDataSource";
-import { Categoria } from "@/model/categoria";
+import { container } from "@/di/container";
+import { Categoria } from "@/model/entities/categoria";
+import { DomainError } from "@/model/errors";
+import { IMenuUseCases } from "@/usecase/iMenuUseCases";
 
 // ============================================================================
 // VIEWMODEL: useHomeViewModel
 // Gerencia o estado da tela inicial (categorias) e a navegação até a
-// categoria selecionada. A View (src/view/index.tsx) só lê o estado e
-// dispara as ações — ela não sabe nada sobre o DataSource nem sobre rotas.
+// categoria selecionada. Não conhece datasources, infraestrutura nem regras
+// de negócio: depende apenas da abstração IMenuUseCases, injetada por
+// parâmetro (com default do container de injeção de dependências).
 // ============================================================================
 
 export type HomeState = {
   categorias: Categoria[];
   carregando: boolean;
+  erro: string | null;
 };
 
 export type HomeActions = {
   handleSelecionarCategoria: (categoriaId: string) => void;
 };
 
-// Instância criada uma única vez, no nível do módulo (e não dentro do hook),
-// para não ser recriada a cada render da tela.
-const dataSource = new CardapioDataSource();
+const MENSAGEM_ERRO_PADRAO = "Não foi possível carregar as categorias.";
 
-export function useHomeViewModel(): [HomeState, HomeActions] {
+export function useHomeViewModel(
+  useCases: IMenuUseCases = container.menuUseCases
+): [HomeState, HomeActions] {
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [carregando, setCarregando] = useState<boolean>(true);
+  const [erro, setErro] = useState<string | null>(null);
 
   useEffect(() => {
     async function carregarCategorias() {
       try {
         setCarregando(true);
-        const resultado = await dataSource.buscarCategorias();
+        setErro(null);
+        const resultado = await useCases.listarCategorias();
         setCategorias(resultado);
-      } catch (erro: unknown) {
-        console.error("Erro ao carregar categorias:", erro);
+      } catch (falha: unknown) {
+        // Erros de domínio já trazem mensagem amigável ao usuário; qualquer
+        // outro tipo (falha inesperada) cai na mensagem padrão.
+        setErro(
+          falha instanceof DomainError ? falha.message : MENSAGEM_ERRO_PADRAO
+        );
       } finally {
         setCarregando(false);
       }
     }
 
     carregarCategorias();
-  }, []);
+  }, [useCases]);
 
   function handleSelecionarCategoria(categoriaId: string) {
     router.push(`/category/${categoriaId}` as any);
   }
 
-  return [{ categorias, carregando }, { handleSelecionarCategoria }];
+  return [{ categorias, carregando, erro }, { handleSelecionarCategoria }];
 }

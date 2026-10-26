@@ -52,6 +52,10 @@ export default function CategoryScreen() {
           <ActivityIndicator size="large" color="#501673" />
           <Text style={styles.loadingTexto}>Buscando itens no banco...</Text>
         </View>
+      ) : state.erro ? (
+        <View style={styles.vazioContainer}>
+          <Text style={styles.erroTexto}>{state.erro}</Text>
+        </View>
       ) : (
         <FlatList
           data={state.produtos}
@@ -192,5 +196,10 @@ const styles = StyleSheet.create({
   vazioTexto: {
     fontSize: 15,
     color: "#8c959f",
+  },
+  erroTexto: {
+    fontSize: 16,
+    color: "#dc3545",
+    textAlign: "center",
   },
 });

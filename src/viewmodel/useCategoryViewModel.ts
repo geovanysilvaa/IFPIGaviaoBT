@@ -1,14 +1,16 @@
 import { useEffect, useState } from "react";
 import { router, useLocalSearchParams } from "expo-router";
-import { CardapioDataSource } from "@/model/cardapioDataSource";
-import { Produto } from "@/model/produto";
+import { container } from "@/di/container";
+import { Produto } from "@/model/entities/produto";
+import { DomainError } from "@/model/errors";
+import { IMenuUseCases } from "@/usecase/iMenuUseCases";
 import { formatarPreco } from "./formatarPreco";
 
 // ============================================================================
 // VIEWMODEL: useCategoryViewModel
-// Gerencia o estado da tela de listagem de itens de uma categoria: lê o
-// parâmetro de rota "id", busca os produtos no DataSource e centraliza a
-// navegação (voltar ao início / abrir detalhes de um produto).
+// Gerencia o estado da tela de listagem de itens de uma categoria. Lê apenas o
+// parâmetro de rota "id" e delega toda a lógica aos Casos de Uso injetados
+// (IMenuUseCases), sem conhecer datasources nem regras de negócio.
 // ============================================================================
 
 // Tipo de apresentação: o Produto do Model acrescido do preço já formatado,
@@ -19,6 +21,7 @@ export type CategoryState = {
   produtos: ProdutoListItem[];
   carregando: boolean;
   nomeCategoria: string;
+  erro: string | null;
 };
 
 export type CategoryActions = {
@@ -26,45 +29,54 @@ export type CategoryActions = {
   handleSelecionarProduto: (produtoId: string) => void;
 };
 
-const dataSource = new CardapioDataSource();
+const NOME_CATEGORIA_PADRAO = "Cardápio";
+const MENSAGEM_ERRO_PADRAO = "Não foi possível carregar os itens.";
 
-export function useCategoryViewModel(): [CategoryState, CategoryActions] {
+export function useCategoryViewModel(
+  useCases: IMenuUseCases = container.menuUseCases
+): [CategoryState, CategoryActions] {
   const { id } = useLocalSearchParams<{ id: string }>();
   const categoriaId = Array.isArray(id) ? id[0] : id;
 
   const [produtos, setProdutos] = useState<ProdutoListItem[]>([]);
   const [carregando, setCarregando] = useState<boolean>(true);
-
-  const nomeCategoria =
-    categoriaId === "bebidas"
-      ? "Bebidas"
-      : categoriaId === "comidas"
-      ? "Comidas"
-      : "Cardápio";
+  const [nomeCategoria, setNomeCategoria] = useState<string>(
+    NOME_CATEGORIA_PADRAO
+  );
+  const [erro, setErro] = useState<string | null>(null);
 
   useEffect(() => {
     async function carregarProdutos() {
       if (!categoriaId) return;
       try {
         setCarregando(true);
-        const resultado = await dataSource.buscarProdutosPorCategoria(
-          categoriaId
-        );
+        setErro(null);
+
+        // Consultas independentes disparadas em paralelo para reduzir o
+        // tempo total de espera da tela.
+        const [resultadoProdutos, resultadoNomeCategoria] = await Promise.all([
+          useCases.listarProdutosPorCategoria(categoriaId),
+          useCases.obterNomeCategoria(categoriaId),
+        ]);
+
         setProdutos(
-          resultado.map((produto) => ({
+          resultadoProdutos.map((produto) => ({
             ...produto,
             precoFormatado: formatarPreco(produto.preco),
           }))
         );
-      } catch (erro: unknown) {
-        console.error("Erro ao buscar produtos da categoria:", erro);
+        setNomeCategoria(resultadoNomeCategoria);
+      } catch (falha: unknown) {
+        setErro(
+          falha instanceof DomainError ? falha.message : MENSAGEM_ERRO_PADRAO
+        );
       } finally {
         setCarregando(false);
       }
     }
 
     carregarProdutos();
-  }, [categoriaId]);
+  }, [categoriaId, useCases]);
 
   function handleVoltar() {
     router.back();
@@ -75,7 +87,7 @@ export function useCategoryViewModel(): [CategoryState, CategoryActions] {
   }
 
   return [
-    { produtos, carregando, nomeCategoria },
+    { produtos, carregando, nomeCategoria, erro },
     { handleVoltar, handleSelecionarProduto },
   ];
 }

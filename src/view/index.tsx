@@ -56,6 +56,10 @@ export default function HomeScreen() {
             <ActivityIndicator size="large" color="#501673" />
             <Text style={styles.loadingTexto}>Consultando cardápio...</Text>
           </View>
+        ) : state.erro ? (
+          <View style={styles.loadingContainer}>
+            <Text style={styles.erroTexto}>{state.erro}</Text>
+          </View>
         ) : (
           <View style={styles.gridCategorias}>
             {state.categorias.map((cat) => (
@@ -157,6 +161,11 @@ const styles = StyleSheet.create({
     marginTop: 12,
     fontSize: 15,
     color: "#6c757d",
+  },
+  erroTexto: {
+    fontSize: 16,
+    color: "#dc3545",
+    textAlign: "center",
   },
   gridCategorias: {
     flexDirection: "row",

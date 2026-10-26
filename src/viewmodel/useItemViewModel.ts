@@ -1,20 +1,23 @@
 import { useEffect, useState } from "react";
 import { router, useLocalSearchParams } from "expo-router";
-import { CardapioDataSource } from "@/model/cardapioDataSource";
-import { Produto } from "@/model/produto";
+import { container } from "@/di/container";
+import { Produto } from "@/model/entities/produto";
+import { DomainError } from "@/model/errors";
+import { IMenuUseCases } from "@/usecase/iMenuUseCases";
 import { formatarPreco } from "./formatarPreco";
 
 // ============================================================================
 // VIEWMODEL: useItemViewModel
-// Gerencia o estado da tela de detalhes do produto: busca o produto no
-// DataSource, controla a quantidade selecionada e centraliza a navegação
-// de volta ao cardápio.
+// Gerencia o estado da tela de detalhes do produto: delega a busca aos Casos de
+// Uso injetados (IMenuUseCases), controla a quantidade selecionada e centraliza
+// a navegação de volta. Não conhece datasources nem regras de domínio.
 // ============================================================================
 
 export type ItemState = {
   produto: (Produto & { precoFormatado: string }) | null;
   carregando: boolean;
   quantidade: number;
+  erro: string | null;
 };
 
 export type ItemActions = {
@@ -23,9 +26,11 @@ export type ItemActions = {
   handleDecrementarQuantidade: () => void;
 };
 
-const dataSource = new CardapioDataSource();
+const MENSAGEM_ERRO_PADRAO = "Não foi possível carregar os detalhes do item.";
 
-export function useItemViewModel(): [ItemState, ItemActions] {
+export function useItemViewModel(
+  useCases: IMenuUseCases = container.menuUseCases
+): [ItemState, ItemActions] {
   const { id } = useLocalSearchParams<{ id: string }>();
   const produtoId = Array.isArray(id) ? id[0] : id;
 
@@ -34,27 +39,30 @@ export function useItemViewModel(): [ItemState, ItemActions] {
   >(null);
   const [carregando, setCarregando] = useState<boolean>(true);
   const [quantidade, setQuantidade] = useState<number>(1);
+  const [erro, setErro] = useState<string | null>(null);
 
   useEffect(() => {
     async function carregarDetalhes() {
       if (!produtoId) return;
       try {
         setCarregando(true);
-        const resultado = await dataSource.buscarProdutoPorId(produtoId);
-        setProduto(
-          resultado
-            ? { ...resultado, precoFormatado: formatarPreco(resultado.preco) }
-            : null
+        setErro(null);
+        const resultado = await useCases.obterProdutoPorId(produtoId);
+        setProduto({
+          ...resultado,
+          precoFormatado: formatarPreco(resultado.preco),
+        });
+      } catch (falha: unknown) {
+        setErro(
+          falha instanceof DomainError ? falha.message : MENSAGEM_ERRO_PADRAO
         );
-      } catch (erro: unknown) {
-        console.error("Erro ao buscar detalhes do produto:", erro);
       } finally {
         setCarregando(false);
       }
     }
 
     carregarDetalhes();
-  }, [produtoId]);
+  }, [produtoId, useCases]);
 
   function handleVoltar() {
     router.back();
@@ -69,7 +77,7 @@ export function useItemViewModel(): [ItemState, ItemActions] {
   }
 
   return [
-    { produto, carregando, quantidade },
+    { produto, carregando, quantidade, erro },
     { handleVoltar, handleIncrementarQuantidade, handleDecrementarQuantidade },
   ];
 }

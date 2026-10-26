@@ -1,8 +1,9 @@
 import { ImageSourcePropType } from "react-native";
 
 // ============================================================================
-// MODEL: Entidade Produto
+// DOMÍNIO: Entidade Produto
 // Representa um item do cardápio (comida ou bebida).
+// Entidade pura: não conhece React, rotas, datasources nem infraestrutura.
 // ============================================================================
 export type Produto = {
   id: string;

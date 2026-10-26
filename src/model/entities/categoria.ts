@@ -1,8 +1,9 @@
 import { ImageSourcePropType } from "react-native";
 
 // ============================================================================
-// MODEL: Entidade Categoria
+// DOMÍNIO: Entidade Categoria
 // Representa uma categoria do cardápio (ex.: Comidas, Bebidas).
+// Entidade pura: não conhece React, rotas, datasources nem infraestrutura.
 // ============================================================================
 export type Categoria = {
   id: string;
